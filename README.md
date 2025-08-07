@@ -61,7 +61,7 @@ end_fsync=1
 group_reporting
 ```
 
-mxfio支持的其他参数配置，参考HOWTO.rst或者https://fio.readthedocs.io/en/latest/。
+mxfio支持的其他参数配置，参考HOWTO.rst或者 [Welcome to FIO’s documentation!](https://fio.readthedocs.io/en/latest/)。
 
 mxfio 测试完成后会输出详细的测试结果报告，常见的指标有：
 
@@ -69,4 +69,4 @@ mxfio 测试完成后会输出详细的测试结果报告，常见的指标有�
 + **IOPS（Input/Output Operations Per Second）**：即每秒输入输出操作次数，对于一些频繁进行小数据量读写的场景（像数据库中大量的事务操作，每次读写的数据量不大但操作很频繁），IOPS 是个很重要的性能衡量指标。
 + **平均响应时间（Average Latency）**：反映了从发出 I/O 请求到得到响应所花费的平均时间，单位一般是毫秒（ms），较短的平均响应时间意味着存储设备能够快速响应读写请求。
 
-当前移植的mxfio基于开源fio-3.40版本https://github.com/axboe/fio/tree/fio-3.40，依赖glibc 2.30及其以上。Ubuntu18.04 OS中默认安装的glibc 版本低于V2.30, 无法运行当前移植的mxfio。
+当前移植的mxfio基于开源fio-3.40版本[axboe/fio](https://github.com/axboe/fio/tree/fio-3.40)，依赖glibc 2.30及其以上。Ubuntu18.04 OS中默认安装的glibc 版本低于V2.30, 无法运行当前移植的mxfio。
