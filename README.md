@@ -1,3 +1,4 @@
+ *Copyright (c) 2025 MetaX Integrated Circuits (Shanghai) Co., Ltd. All Rights Reserved.*
 # mxfio
 fio（Flexible I/O Tester）是一款功能强大且灵活的开源磁盘 I/O 性能测试工具。它可以对块设备（比如磁盘、固态硬盘等）以及文件系统进行多种类型的 I/O 性能测试，在存储系统的性能评估、优化等方面有着广泛应用。
 
