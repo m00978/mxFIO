@@ -6,7 +6,7 @@ mkdir build
 
 cd build
 
-../configure --enable-libcufile --enable-cuda
+../configure --enable-cuda --enable-libcufile
 
 make -j 12
 

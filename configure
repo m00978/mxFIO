@@ -64,7 +64,7 @@ CFLAGS="$CFLAGS -I${MACA_PATH}/include/mcsparse"
 CFLAGS="$CFLAGS -I${MACA_PATH}/include/mcrand"
 CFLAGS="$CFLAGS -I${MACA_PATH}/include/common"
 CFLAGS="$CFLAGS -I${MACA_PATH}/include/mctx"
-
+CFLAGS="$CFLAGS -I${MACA_PATH}/include/mxsml"
 
 CONFIGURE_CFLAGS="-Werror-implicit-function-declaration"
 BUILD_CFLAGS=""
@@ -202,6 +202,7 @@ devdax="no"
 pmem="no"
 cuda="no"
 libcufile="no"
+nds="no"
 disable_lex=""
 disable_pmem="no"
 disable_native="no"
@@ -272,6 +273,8 @@ for opt do
   --enable-cuda) cuda="yes"
   ;;
   --enable-libcufile) libcufile="yes"
+  ;;
+  --enable-nds) nds="yes"
   ;;
   --disable-native) disable_native="yes"
   ;;
@@ -344,6 +347,7 @@ if test "$show_help" = "yes" ; then
   echo "--disable-optimizations Don't enable compiler optimizations"
   echo "--enable-cuda           Enable GPUDirect RDMA support"
   echo "--enable-libcufile      Enable GPUDirect Storage cuFile support"
+  echo "--enable-nds            Enable GPUDirect Storage support with Huawei NDS file system"
   echo "--disable-native        Don't build for native host"
   echo "--disable-avx512        Disable AVX512 instruction set usage"
   echo "--with-ime=             Install path for DDN's Infinite Memory Engine"
@@ -2793,7 +2797,7 @@ print_config "cuda" "$cuda"
 
 ##########################################
 # libcufile probe
-if test "$libcufile" != "no" ; then
+if [ "$libcufile" != "no" ] && [ "$nds" = "no" ] ; then
 cat > $TMPC << EOF
 #include "cudatomaca.h"
 #include "mcfile.h"
@@ -2812,6 +2816,26 @@ EOF
     fi
     libcufile="no"
   fi
+elif [ "$libcufile" != "no" ] && [ "$nds" != "no" ] ; then
+cat > $TMPC << EOF
+#include "nds_file.h"
+
+int main(int argc, char* argv[]) {
+   nds_driver_open();
+   return 0;
+}
+EOF
+  if compile_prog "" "-lruntime_cu -lmcruntime -lndsfs -ldl" "libcufile"; then
+    libcufile="yes"
+    LIBS="-lruntime_cu -lmcruntime -lndsfs -ldl $LIBS"
+  else
+    if test "$libcufile" = "yes" ; then
+      feature_not_found "libcufile" ""
+    fi
+    libcufile="no"
+  fi
+else
+  printf "Configure not supported."
 fi
 print_config "libcufile" "$libcufile"
 
@@ -3309,6 +3333,9 @@ if test "$cuda" = "yes" ; then
 fi
 if test "$libcufile" = "yes" ; then
   output_sym "CONFIG_LIBCUFILE"
+fi
+if test "$nds" = "yes" ; then
+  output_sym "CONFIG_NDS"
 fi
 if test "$dfs" = "yes" ; then
   output_sym "CONFIG_DFS"
