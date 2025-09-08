@@ -1,21 +1,22 @@
 The mxfio project is modified from fio (https://github.com/axboe/fio).
-Please see the LICENSE for the license for this project.
+Please see the COPYING for the license for this project.
 
 This project contains third-party components with separate copyright notices and license terms. Your use of the source code for the these third-party components are subject to the terms and conditions of their licenses.
 
 The following files may have been modified by MetaX Integrated Circuits (Shanghai) Co., Ltd. in 2025.  Modification copyright 2025 MetaX Integrated Circuits (Shanghai) Co.,Ltd.
 
-fio/configure
-fio/engines/libcufile.c
-fio/ci/actions-full-test.sh
-fio/t/fiotestlib.py
-fio/t/run-fio-tests.py
+mxFIO/configure
+mxFIO/engines/libcufile.c
+mxFIO/ci/actions-full-test.sh
+mxFIO/t/fiotestlib.py
+mxFIO/t/run-fio-tests.py
 
 The following files are newly added by MetaX Integrated Circuits (Shanghai) Co., Ltd. in 2025.   All rights reserved.
 
-fio/README.md
-fio/batch_run.sh
-fio/build.sh
-fio/cudatomaca.h
-fio/fio_test.sh
-fio/t/jobs/t0030-mx.fio
+mxFIO/README.md
+mxFIO/batch_run.sh
+mxFIO/build.sh
+mxFIO/cudatomaca.h
+mxFIO/cudatocann.h
+mxFIO/fio_test.sh
+mxFIO/t/jobs/t0030-mx.fio
