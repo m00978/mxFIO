@@ -15,8 +15,10 @@ fio支持多种I/O引擎，其中包括libcufile和psync。我们将fio移植到
 **mxfio编译安装请参考build.sh**
 
 首先设置环境变量如下：
+```
 export MACA_PATH=/opt/maca
 export LD_LIBRARY_PATH=/opt/maca/lib:/opt/mxdriver/lib
+```
 
 build.sh内容如下：
 

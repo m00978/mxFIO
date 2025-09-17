@@ -2821,7 +2821,7 @@ cat > $TMPC << EOF
 #include "nds_file.h"
 
 int main(int argc, char* argv[]) {
-   nds_driver_open();
+   nds_driver_open(0);
    return 0;
 }
 EOF
