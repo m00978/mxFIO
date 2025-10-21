@@ -199,9 +199,8 @@ static int fio_libcufile_init(struct thread_data *td)
 		}
 	}
 	running++;
-	initialized = cufile_initialized;
 	pthread_mutex_unlock(&running_lock);
-#else // Currently, Huawei NDS file system supports multi-process, but not multi-thread read/write.
+#else // Huawei NDS file system supports GPU dirver open with specific gpu_id
 	o->my_gpu_id = fio_libcufile_find_gpu_id(td);
 	if (o->my_gpu_id < 0)
 		return 1;
@@ -212,7 +211,7 @@ static int fio_libcufile_init(struct thread_data *td)
 	else
 		cufile_initialized = 1;
 #endif
-
+	initialized = cufile_initialized;
 	if (o->cuda_io == IO_CUFILE && !initialized)
 		return 1;
 #ifndef CONFIG_NDS
@@ -682,7 +681,7 @@ static void fio_libcufile_iomem_free(struct thread_data *td)
 static void fio_libcufile_cleanup(struct thread_data *td)
 {
 	struct libcufile_options *o = td->eo;
-
+#ifndef CONFIG_NDS
 	pthread_mutex_lock(&running_lock);
 	running--;
 	assert(running >= 0);
@@ -690,14 +689,15 @@ static void fio_libcufile_cleanup(struct thread_data *td)
 		/* only close the driver if initialized and
 		   this is the last worker thread */
 		if (o->cuda_io == IO_CUFILE && cufile_initialized)
-#ifndef CONFIG_NDS
 			cuFileDriverClose();
-#else
-			nds_driver_close();
-#endif
 		cufile_initialized = 0;
 	}
 	pthread_mutex_unlock(&running_lock);
+#else
+	if (o->cuda_io == IO_CUFILE && cufile_initialized)
+		nds_driver_close();
+	cufile_initialized = 0;
+#endif
 }
 
 FIO_STATIC struct ioengine_ops ioengine = {
