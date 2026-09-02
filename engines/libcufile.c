@@ -58,7 +58,7 @@ struct libcufile_options {
 	int                 logged;        /* bitmask of log messages that have
 					      been output, prevent flood */
 };
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 struct fio_libcufile_data {
 	CUfileDescr_t  cf_descr;
 	CUfileHandle_t cf_handle;
@@ -99,9 +99,11 @@ static struct fio_option options[] = {
 	},
 };
 
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 static int running = 0;
-static int cufile_initialized = 0;
 static pthread_mutex_t running_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+static int cufile_initialized = 0;
 
 #define check_cudaruntimecall(fn, rc)                                               \
 	do {                                                                        \
@@ -169,8 +171,11 @@ static int fio_libcufile_find_gpu_id(struct thread_data *td)
 
 		free(gpu_ids);
 	}
-
+#ifdef CONFIG_CUFILE2
+    return find_gpu_device_from_id(gpu_id);
+#else
 	return gpu_id;
+#endif
 }
 
 static int fio_libcufile_init(struct thread_data *td)
@@ -184,7 +189,7 @@ static int fio_libcufile_init(struct thread_data *td)
 	int initialized;
 	int rc;
 
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 	pthread_mutex_lock(&running_lock);
 	if (running == 0) {
 		assert(cufile_initialized == 0);
@@ -200,21 +205,30 @@ static int fio_libcufile_init(struct thread_data *td)
 	}
 	running++;
 	pthread_mutex_unlock(&running_lock);
-#else // Huawei NDS file system supports GPU dirver open with specific gpu_id
+#else
 	o->my_gpu_id = fio_libcufile_find_gpu_id(td);
 	if (o->my_gpu_id < 0)
 		return 1;
-	status = nds_driver_open(o->my_gpu_id);
-	if (status != NDS_FILE_SUCCESS)
-		log_err("nds_driver_open: err=%d:%s\n", status,
-			fio_libcufile_get_cuda_error(status));
-	else
-		cufile_initialized = 1;
+    if (o->cuda_io == IO_CUFILE) {
+#if defined(CONFIG_CUFILE2)
+		status = cuFileDriverOpen(o->my_gpu_id);
+		if (status.err != CU_FILE_SUCCESS)
+			log_err("cuFileDriverOpen: err=%d:%s\n", status.err,
+				fio_libcufile_get_cuda_error(status));
+#elif defined(CONFIG_NDS) // Huawei NDS file system supports GPU dirver open with specific gpu_id
+    	status = nds_driver_open(o->my_gpu_id);
+	    if (status != NDS_FILE_SUCCESS)
+		    log_err("nds_driver_open: err=%d:%s\n", status,
+			    fio_libcufile_get_cuda_error(status));
+#endif
+		else
+			cufile_initialized = 1;
+	}
 #endif
 	initialized = cufile_initialized;
 	if (o->cuda_io == IO_CUFILE && !initialized)
 		return 1;
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 	o->my_gpu_id = fio_libcufile_find_gpu_id(td);
 	if (o->my_gpu_id < 0)
 		return 1;
@@ -318,7 +332,7 @@ static enum fio_q_status fio_libcufile_queue(struct thread_data *td,
 					     struct io_u *io_u)
 {
 	struct libcufile_options *o = td->eo;
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
     struct fio_libcufile_data *fcd = FILE_ENG_DATA(io_u->file);
 #else
 	int *fd = FILE_ENG_DATA(io_u->file);
@@ -329,7 +343,7 @@ static enum fio_q_status fio_libcufile_queue(struct thread_data *td,
 	size_t xfered;
 	size_t gpu_offset;
 	int rc;
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
     if (o->cuda_io == IO_CUFILE && fcd == NULL) {
 		io_u->error = EINVAL;
 		td_verror(td, EINVAL, "xfer");
@@ -399,8 +413,12 @@ static enum fio_q_status fio_libcufile_queue(struct thread_data *td,
 			if (io_u->ddir == DDIR_READ) {
 				if (o->cuda_io == IO_CUFILE) {
 #ifndef CONFIG_NDS
+#ifndef CONFIG_CUFILE2
 					sz = cuFileRead(fcd->cf_handle, o->cu_mem_ptr, remaining,
 							io_offset + xfered, gpu_offset + xfered);
+#else
+                    sz = cuFileRead(*fd, o->my_gpu_id, o->cu_mem_ptr, gpu_offset + xfered, remaining, io_offset + xfered);
+#endif
 					if (sz == -1) {
 						io_u->error = errno;
 						log_err("cuFileRead: err=%d\n", errno);
@@ -435,8 +453,12 @@ static enum fio_q_status fio_libcufile_queue(struct thread_data *td,
 			} else if (io_u->ddir == DDIR_WRITE) {
 				if (o->cuda_io == IO_CUFILE) {
 #ifndef CONFIG_NDS
+#ifndef CONFIG_CUFILE2
 					sz = cuFileWrite(fcd->cf_handle, o->cu_mem_ptr, remaining,
 							 io_offset + xfered, gpu_offset + xfered);
+#else
+					sz = cuFileWrite(*fd, o->my_gpu_id, o->cu_mem_ptr, gpu_offset + xfered, remaining, io_offset + xfered);
+#endif
 					if (sz == -1) {
 						io_u->error = errno;
 						log_err("cuFileWrite: err=%d\n", errno);
@@ -510,20 +532,16 @@ static enum fio_q_status fio_libcufile_queue(struct thread_data *td,
 static int fio_libcufile_open_file(struct thread_data *td, struct fio_file *f)
 {
 	struct libcufile_options *o = td->eo;
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 	struct fio_libcufile_data *fcd = NULL;
 #else
 	int *fd = NULL;
 #endif
-	int rc;
-#ifndef CONFIG_NDS
-	CUfileError_t status;
-#endif
 
-	rc = generic_open_file(td, f);
+    int rc = generic_open_file(td, f);
 	if (rc)
 		return rc;
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 	if (o->cuda_io == IO_CUFILE) {
 		fcd = calloc(1, sizeof(*fcd));
 		if (fcd == NULL) {
@@ -533,7 +551,7 @@ static int fio_libcufile_open_file(struct thread_data *td, struct fio_file *f)
 
 		fcd->cf_descr.handle.fd = f->fd;
 		fcd->cf_descr.type = CU_FILE_HANDLE_TYPE_OPAQUE_FD;
-		status = cuFileHandleRegister(&fcd->cf_handle, &fcd->cf_descr);
+		CUfileError_t status = cuFileHandleRegister(&fcd->cf_handle, &fcd->cf_descr);
 		if (status.err != CU_FILE_SUCCESS) {
 			log_err("cufile register: err=%d:%s\n", status.err,
 				fio_libcufile_get_cuda_error(status));
@@ -558,7 +576,7 @@ static int fio_libcufile_open_file(struct thread_data *td, struct fio_file *f)
 	return 0;
 
 exit_err:
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 	if (fcd) {
 		free(fcd);
 		fcd = NULL;
@@ -579,30 +597,29 @@ exit_err:
 
 static int fio_libcufile_close_file(struct thread_data *td, struct fio_file *f)
 {
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 	struct fio_libcufile_data *fcd = FILE_ENG_DATA(f);
-#endif
-	int rc;
-	FILE_SET_ENG_DATA(f, NULL);
-#ifndef CONFIG_NDS
 	if (fcd != NULL) {
 		cuFileHandleDeregister(fcd->cf_handle);
 		FILE_SET_ENG_DATA(f, NULL);
 		free(fcd);
 	}
+#else
+    int* fd = FILE_ENG_DATA(f);
+	if (fd != NULL) {
+	    FILE_SET_ENG_DATA(f, NULL);
+		free(fd);
+	}
 #endif
-	rc = generic_close_file(td, f);
 
-	return rc;
+	return generic_close_file(td, f);
 }
 
 static int fio_libcufile_iomem_alloc(struct thread_data *td, size_t total_mem)
 {
 	struct libcufile_options *o = td->eo;
 	int rc;
-#ifndef CONFIG_NDS
-	CUfileError_t status;
-#endif
+
 	o->total_mem = total_mem;
 	o->logged = 0;
 	o->cu_mem_ptr = NULL;
@@ -630,7 +647,12 @@ static int fio_libcufile_iomem_alloc(struct thread_data *td, size_t total_mem)
 		goto exit_error;
 #ifndef CONFIG_NDS
 	if (o->cuda_io == IO_CUFILE) {
-		status = cuFileBufRegister(o->cu_mem_ptr, total_mem, 0);
+#ifndef CONFIG_CUFILE2
+		CUfileError_t status = cuFileBufRegister(o->cu_mem_ptr, total_mem, 0);
+#else
+        void *target_addr = NULL;
+        CUfileError_t status = cuFileBufRegister(o->my_gpu_id, o->cu_mem_ptr, total_mem, &target_addr);
+#endif
 		if (status.err != CU_FILE_SUCCESS) {
 			log_err("cuFileBufRegister: err=%d:%s\n", status.err,
 				fio_libcufile_get_cuda_error(status));
@@ -667,7 +689,11 @@ static void fio_libcufile_iomem_free(struct thread_data *td)
 	if (o->cu_mem_ptr) {
 #ifndef CONFIG_NDS
 		if (o->cuda_io == IO_CUFILE)
+#ifndef CONFIG_CUFILE2
 			cuFileBufDeregister(o->cu_mem_ptr);
+#else
+            cuFileBufDeregister(o->my_gpu_id, o->cu_mem_ptr, o->total_mem);
+#endif
 #endif
 		cudaFree(o->cu_mem_ptr);
 		o->cu_mem_ptr = NULL;
@@ -681,7 +707,7 @@ static void fio_libcufile_iomem_free(struct thread_data *td)
 static void fio_libcufile_cleanup(struct thread_data *td)
 {
 	struct libcufile_options *o = td->eo;
-#ifndef CONFIG_NDS
+#if !defined(CONFIG_CUFILE2) && !defined(CONFIG_NDS)
 	pthread_mutex_lock(&running_lock);
 	running--;
 	assert(running >= 0);
@@ -695,7 +721,11 @@ static void fio_libcufile_cleanup(struct thread_data *td)
 	pthread_mutex_unlock(&running_lock);
 #else
 	if (o->cuda_io == IO_CUFILE && cufile_initialized)
+#if defined(CONFIG_CUFILE2)
+		mcFileDriverClose(o->my_gpu_id);
+#elif defined(CONFIG_NDS)
 		nds_driver_close();
+#endif
 	cufile_initialized = 0;
 #endif
 }

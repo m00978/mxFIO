@@ -292,7 +292,9 @@ int allocate_io_mem(struct thread_data *td)
 
 	if (td_ioengine_flagged(td, FIO_NOIO))
 		return 0;
-
+#ifdef CONFIG_CUFILE2
+	total_mem = td->o.size;
+#else
 	total_mem = td->orig_buffer_size;
 
 	if (td->o.odirect || td->o.mem_align ||
@@ -301,7 +303,7 @@ int allocate_io_mem(struct thread_data *td)
 		if (td->o.mem_align && td->o.mem_align > page_size)
 			total_mem += td->o.mem_align - page_size;
 	}
-
+#endif
 	dprint(FD_MEM, "Alloc %llu for buffers\n", (unsigned long long) total_mem);
 
 	/*
@@ -339,11 +341,13 @@ int allocate_io_mem(struct thread_data *td)
 void free_io_mem(struct thread_data *td)
 {
 	unsigned int total_mem;
-
+#ifdef CONFIG_CUFILE2
+	total_mem = td->o.size;
+#else
 	total_mem = td->orig_buffer_size;
 	if (td->o.odirect)
 		total_mem += page_mask;
-
+#endif
 	if (td->io_ops->iomem_alloc && !fio_option_is_set(&td->o, mem_type)) {
 		if (td->io_ops->iomem_free)
 			td->io_ops->iomem_free(td);
